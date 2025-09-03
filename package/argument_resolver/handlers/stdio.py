@@ -30,7 +30,7 @@ class StdioHandlers(HandlerBase):
     Handlers for <stdio.h>'s functions.
     """
 
-    # TODO Handle strstr
+    # strstr is handled in StringHandlers
 
     def _handle_sprintf(
         self,
@@ -317,7 +317,7 @@ class StdioHandlers(HandlerBase):
         self.log.debug("RDA: asprintf(): Using sprintf().")
         return self._handle_sprintf(state, stored_func)
 
-    # TODO Handle __sprintf_chk __snprintf_chk strstr
+    # __sprintf_chk, __snprintf_chk are handled below, strstr is handled in StringHandlers
 
     @HandlerBase.returns
     @HandlerBase.tag_parameter_definitions

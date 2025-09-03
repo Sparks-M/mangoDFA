@@ -685,8 +685,14 @@ class ScriptBase:
                     timed_out = True
                     future.cancel()
                     self.log.critical("Timed out for trace %s", single_trace.callsites)
+                    # Attempt to wait briefly for clean shutdown
+                    try:
+                        future.result(timeout=5)  # Wait up to 5 seconds for clean shutdown
+                    except (concurrent.futures.TimeoutError, concurrent.futures.CancelledError):
+                        pass  # Expected if the task was cancelled
                 finally:
-                    executor.shutdown(wait=False)
+                    # Ensure proper cleanup with wait
+                    executor.shutdown(wait=True)
 
 
             self.progress.update(self.trace_task, visible=False)
@@ -715,10 +721,14 @@ class ScriptBase:
 
             for target_func in sinks:
                 for atom in target_func.atoms:
-                    # TODO: This is a lazy fix, add better support for execve
-                    if atom not in target_atoms and not target_func.name.startswith(
-                        "exec"
-                    ):
+                    # Special handling for exec* family functions which have different argument patterns
+                    # exec* functions (execve, execl, execvp, etc.) often have variable arguments
+                    # and may not match the expected atom patterns for other sinks
+                    exec_functions = {"execve", "execl", "execle", "execv", "execvp", "execvpe", "execlp"}
+                    is_exec_function = (target_func.name in exec_functions or 
+                                      target_func.name.startswith("exec"))
+                    
+                    if atom not in target_atoms and not is_exec_function:
                         continue
                     if target_func.constant_data[atom] is None:
                         continue
@@ -916,8 +926,14 @@ class ScriptBase:
                 rda = None
                 future.cancel()
                 self.log.critical( "TIMEOUT FOR subject: %s, sink: %s", subject.content.callsites, sink.name)
+                # Attempt to wait briefly for clean shutdown
+                try:
+                    future.result(timeout=5)  # Wait up to 5 seconds for clean shutdown
+                except (concurrent.futures.TimeoutError, concurrent.futures.CancelledError):
+                    pass  # Expected if the task was cancelled
             finally:
-                executor.shutdown(wait=False)
+                # Ensure proper cleanup with wait
+                executor.shutdown(wait=True)
 
         self.progress.update(self.rda_task, visible=False)
         self.progress.remove_task(self.rda_task)

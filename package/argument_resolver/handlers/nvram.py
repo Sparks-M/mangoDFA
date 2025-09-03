@@ -35,8 +35,35 @@ class NVRAMHandlers(HandlerBase):
         :param str handler_name:                     Name of the handler
         """
         self.log.debug("RDA: %s(), ins_addr=%#x", stored_func.name, stored_func.code_loc.ins_addr)
-        # TODO
-        return False, state, None
+        
+        # Get calling convention and extract arguments
+        cc = self._calling_convention_resolver.get_cc(stored_func.name)
+        key_arg = cc.get_next_arg()
+        value_arg = cc.get_next_arg()
+        
+        # Extract key pointer and mark as used
+        key_ptr = Utils.get_values_from_cc_arg(key_arg, state, state.arch)
+        key_ptr_definitions = LiveDefinitions.extract_defs_from_mv(key_ptr)
+        for def_ in key_ptr_definitions:
+            state.add_use_by_def(def_, stored_func.code_loc)
+            
+        # Extract value pointer and mark as used
+        value_ptr = Utils.get_values_from_cc_arg(value_arg, state, state.arch)
+        value_ptr_definitions = LiveDefinitions.extract_defs_from_mv(value_ptr)
+        for def_ in value_ptr_definitions:
+            state.add_use_by_def(def_, stored_func.code_loc)
+        
+        # Extract key and value strings
+        keys = Utils.get_strings_from_pointers(key_ptr, state, stored_func.code_loc)
+        values = Utils.get_strings_from_pointers(value_ptr, state, stored_func.code_loc)
+        
+        # Log the nvram_set operation for analysis
+        for key in Utils.get_values_from_multivalues(keys):
+            for value in Utils.get_values_from_multivalues(values):
+                self.log.debug("NVRAM SET: %s = %s", key, value)
+        
+        # Return success status (typically 0 for nvram_set)
+        return True, state, MultiValues(claripy.BVV(0, state.arch.bits))
 
     @HandlerBase.returns
     @HandlerBase.tag_parameter_definitions

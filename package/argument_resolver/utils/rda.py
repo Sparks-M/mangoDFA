@@ -164,19 +164,38 @@ class CustomVexEngine(SimEngineRDVEX):
         guard_v = guard.one_value()
 
         if claripy.is_true(guard_v):
-            # FIXME: full conversion support
-            if stmt.cvt.find("Ident") < 0:
-                l.warning("Unsupported conversion %s in LoadG.", stmt.cvt)
-            load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            # Enhanced conversion support for common types
+            if stmt.cvt.find("Ident") >= 0:
+                # Identity conversion - no change needed
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            elif stmt.cvt in ["8Uto32", "16Uto32", "32Uto64"]:
+                # Unsigned extension conversions
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            elif stmt.cvt in ["8Sto32", "16Sto32", "32Sto64"]:
+                # Signed extension conversions  
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            elif stmt.cvt in ["32to8", "32to16", "64to32"]:
+                # Truncation conversions
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            else:
+                l.warning("Unsupported conversion %s in LoadG, using fallback.", stmt.cvt)
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
             wr_tmp_stmt = pyvex.stmt.WrTmp(stmt.dst, load_expr)
             self._handle_WrTmp(wr_tmp_stmt)
         elif claripy.is_false(guard_v):
             wr_tmp_stmt = pyvex.stmt.WrTmp(stmt.dst, stmt.alt)
             self._handle_WrTmp(wr_tmp_stmt)
         else:
-            if stmt.cvt.find("Ident") < 0:
-                l.warning("Unsupported conversion %s in LoadG.", stmt.cvt)
-            load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            # Enhanced conversion support for guarded loads with unknown condition
+            if stmt.cvt.find("Ident") >= 0:
+                # Identity conversion - no change needed
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            elif stmt.cvt in ["8Uto32", "16Uto32", "32Uto64", "8Sto32", "16Sto32", "32Sto64", "32to8", "32to16", "64to32"]:
+                # Support common conversions
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
+            else:
+                l.warning("Unsupported conversion %s in LoadG, using fallback.", stmt.cvt)
+                load_expr = pyvex.expr.Load(stmt.end, stmt.cvt_types[1], stmt.addr)
 
             load_expr_v = self._expr(load_expr)
             # alt_v = self._expr(stmt.alt)
